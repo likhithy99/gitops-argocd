@@ -1,0 +1,46 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: demo-app
+  namespace: argocd
+  # Finalizer ensures ArgoCD deletes managed resources when this Application is deleted.
+  # Remove it if you want to delete the Application without touching live resources.
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    # Replace with your actual GitHub repo URL
+    repoURL: https://github.com/likhithy99/gitops-argocd
+    targetRevision: main        # branch, tag, or commit SHA to track
+    path: apps/demo-app         # path inside the repo that contains the manifests
+
+  destination:
+    server: https://kubernetes.default.svc   # the in-cluster API server
+    namespace: demo-app
+
+  syncPolicy:
+    # automated: ArgoCD continuously compares Git ↔ cluster and syncs on any diff.
+    # Without this block, every sync requires a manual click or CLI call.
+    automated:
+      # selfHeal: if someone manually changes a live resource (kubectl edit, kubectl scale,
+      # etc.) ArgoCD detects the drift within ~3 seconds and rolls it back to match Git.
+      # This is the "cluster is always the truth of Git" guarantee.
+      selfHeal: true
+
+      # prune: if a manifest is *deleted* from Git, ArgoCD removes the corresponding
+      # live resource too.  Without prune, deleted manifests leave orphaned resources
+      # in the cluster forever.
+      prune: true
+
+    syncOptions:
+      # Creates the destination namespace automatically if it doesn't exist yet.
+      - CreateNamespace=true
+
+      # Replaces resources that cannot be patched (e.g. immutable fields) instead of
+      # erroring, keeping the sync green.
+      - Replace=false
+
+      # Respect the serverSideApply strategy for large CRDs / field managers.
+      - ServerSideApply=false
